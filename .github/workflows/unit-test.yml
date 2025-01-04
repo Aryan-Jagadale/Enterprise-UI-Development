@@ -7,30 +7,40 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-node.outputs.cache-hit }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Setup Node
-        uses: actions/setup-node@v3
-      - uses: actions/cache@v3
+      - name: Cache Node Modules
+        id: cache-node
+        uses: actions/cache@v3
         with:
           path: ~/.npm
-          key: npm-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Setup Node
+        uses: actions/setup-node@v3
       - run: npm ci
-      - run: npm test
+        if: steps.cache-node.outputs.cache-hit != 'true'
+
+  test:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run Tests
+        run: npm test
 
   build:
     runs-on: ubuntu-latest
+    needs: setup
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Setup Node
-        uses: actions/setup-node@v3
-      - uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: npm-${{ hashFiles('**/package-lock.json') }}
-      - run: npm ci
-      - run: npm run build
+      - name: Build Project
+        run: npm run build
